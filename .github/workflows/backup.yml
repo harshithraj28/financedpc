@@ -1,0 +1,31 @@
+name: Database Backup
+
+on:
+  schedule:
+    - cron: '30 16 * * *'   # 10 PM IST
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install PostgreSQL
+        run: sudo apt-get install postgresql-client -y
+
+      - name: Backup database
+        run: |
+          pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
+
+      - name: Zip backup
+        run: |
+          zip backup_$(date +%F).zip backup.sql
+
+      - name: Save backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-backup
+          path: backup_*.zip
