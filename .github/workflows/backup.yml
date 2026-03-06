@@ -38,6 +38,7 @@ jobs:
 
       - name: Upload to Google Drive
         run: |
+          ./gdrive --service-account key.json list
           ./gdrive --service-account key.json upload --parent ${{ secrets.GOOGLE_DRIVE_FOLDER }} backup_$(date +%F).zip
 
       - name: Upload backup artifact
