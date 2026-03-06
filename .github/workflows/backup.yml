@@ -13,8 +13,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Install PostgreSQL
-        run: sudo apt-get install postgresql-client -y
+      - name: Install PostgreSQL 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
 
       - name: Backup database
         run: |
@@ -24,7 +26,7 @@ jobs:
         run: |
           zip backup_$(date +%F).zip backup.sql
 
-      - name: Save backup artifact
+      - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: database-backup
