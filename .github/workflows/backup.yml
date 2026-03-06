@@ -2,7 +2,7 @@ name: Database Backup
 
 on:
   schedule:
-    - cron: '30 16 * * *'   # 10:00 PM IST
+    - cron: '30 16 * * *'   # 10 PM IST
   workflow_dispatch:
 
 jobs:
@@ -15,51 +15,33 @@ jobs:
         uses: actions/checkout@v3
 
 
-      # Install PostgreSQL 17 client
-      - name: Install PostgreSQL Client
+      - name: Install PostgreSQL
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget gnupg
-          wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
-          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          sudo apt-get install -y postgresql-client zip
 
 
-      # Dump Neon database
-      - name: Backup database
+      - name: Dump database
         run: |
-          /usr/lib/postgresql/17/bin/pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
+          pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
 
 
-      # Zip the backup
       - name: Zip backup
         run: |
           zip backup_$(date +%F).zip backup.sql
 
 
-      # Create Google service key file
-      - name: Create Google credentials
-        run: |
-          echo '${{ secrets.GOOGLE_SERVICE_KEY }}' > key.json
-
-
-      # Install gdrive uploader
-      - name: Install Google Drive uploader
+      - name: Install gdrive uploader
         run: |
           curl -L https://github.com/prasmussen/gdrive/releases/download/2.1.0/gdrive-linux-x64 -o gdrive
           chmod +x gdrive
 
 
-      # Upload backup to Google Drive
-      - name: Upload backup to Google Drive
+      - name: Create service key
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_KEY }}' > key.json
+
+
+      - name: Upload to Google Drive
         run: |
           ./gdrive --service-account key.json upload --parent ${{ secrets.GOOGLE_DRIVE_FOLDER }} backup_$(date +%F).zip
-
-
-      # Optional: Save copy in GitHub artifacts
-      - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: database-backup
-          path: backup_*.zip
