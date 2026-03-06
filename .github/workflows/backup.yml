@@ -14,32 +14,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-
-      - name: Install PostgreSQL
+      - name: Install PostgreSQL client
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client zip
-
 
       - name: Dump database
         run: |
           pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
 
-
       - name: Zip backup
         run: |
           zip backup_$(date +%F).zip backup.sql
-
 
       - name: Install gdrive uploader
         run: |
           curl -L https://github.com/prasmussen/gdrive/releases/download/2.1.0/gdrive-linux-x64 -o gdrive
           chmod +x gdrive
 
-      - name: Create service key
+      - name: Create service account key
         run: |
           echo '${{ secrets.GOOGLE_SERVICE_KEY }}' > key.json
 
       - name: Upload to Google Drive
         run: |
           ./gdrive --service-account key.json upload --parent ${{ secrets.GOOGLE_DRIVE_FOLDER }} backup_$(date +%F).zip
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-backup
+          path: backup_*.zip
