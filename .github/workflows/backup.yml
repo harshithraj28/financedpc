@@ -2,7 +2,7 @@ name: Database Backup
 
 on:
   schedule:
-    - cron: '30 16 * * *'
+    - cron: '30 16 * * *'   # 10:00 PM IST
   workflow_dispatch:
 
 jobs:
@@ -11,9 +11,12 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Install PostgreSQL 17 Client
+
+      # Install PostgreSQL 17 client
+      - name: Install PostgreSQL Client
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gnupg
@@ -22,27 +25,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
+
+      # Dump Neon database
       - name: Backup database
         run: |
           /usr/lib/postgresql/17/bin/pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
 
+
+      # Zip the backup
       - name: Zip backup
         run: |
           zip backup_$(date +%F).zip backup.sql
 
-      - name: Create Google key
+
+      # Create Google service key file
+      - name: Create Google credentials
         run: |
           echo '${{ secrets.GOOGLE_SERVICE_KEY }}' > key.json
 
-      - name: Install Drive uploader
+
+      # Install gdrive uploader
+      - name: Install Google Drive uploader
         run: |
           curl -L https://github.com/prasmussen/gdrive/releases/download/2.1.0/gdrive-linux-x64 -o gdrive
           chmod +x gdrive
 
+
+      # Upload backup to Google Drive
       - name: Upload backup to Google Drive
         run: |
           ./gdrive --service-account key.json upload --parent ${{ secrets.GOOGLE_DRIVE_FOLDER }} backup_$(date +%F).zip
 
-      - name: Delete backups older than 30 days
-        run: |
-          ./gdrive --service-account key.json list --query "modifiedTime < '$(date -d '30 days ago' --iso-8601=seconds)'" | awk '{print $1}' | xargs -I {} ./gdrive --service-account key.json delete {}
+
+      # Optional: Save copy in GitHub artifacts
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-backup
+          path: backup_*.zip
