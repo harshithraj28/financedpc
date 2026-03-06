@@ -36,11 +36,9 @@ jobs:
           curl -L https://github.com/prasmussen/gdrive/releases/download/2.1.0/gdrive-linux-x64 -o gdrive
           chmod +x gdrive
 
-
       - name: Create service key
         run: |
           echo '${{ secrets.GOOGLE_SERVICE_KEY }}' > key.json
-
 
       - name: Upload to Google Drive
         run: |
