@@ -14,7 +14,7 @@ jobs:
       - name: Install PostgreSQL 17 client
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget gnupg
+          sudo apt-get install -y wget gnupg lsb-release
           wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
           echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
@@ -23,7 +23,7 @@ jobs:
       - name: Dump database
         run: |
           set -e
-          pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
+          /usr/lib/postgresql/17/bin/pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
           gzip backup.sql
           mv backup.sql.gz backup_$(date +%F_%H-%M).sql.gz
 
