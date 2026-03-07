@@ -3,7 +3,7 @@ name: Database Backup
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 16 * * *'   # Runs daily at 10 PM IST
+    - cron: '30 16 * * *'
 
 jobs:
   backup:
@@ -11,13 +11,15 @@ jobs:
 
     steps:
 
-      # Install PostgreSQL 17 client (matches Neon server version)
       - name: Install PostgreSQL 17 client
         run: |
           sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
           sudo apt-get install -y postgresql-client-17 gzip git
 
-      # Dump database safely
       - name: Dump database
         run: |
           set -e
@@ -25,23 +27,19 @@ jobs:
           gzip backup.sql
           mv backup.sql.gz backup_$(date +%F_%H-%M).sql.gz
 
-      # Clone backup repository
       - name: Clone backup repository
         run: |
           git clone https://x-access-token:${{ secrets.BACKUP_REPO_TOKEN }}@github.com/${{ secrets.BACKUP_REPO }} backup-repo
 
-      # Move backup into repo
       - name: Move backup
         run: |
           mkdir -p backup-repo/backups
           mv backup_*.sql.gz backup-repo/backups/
 
-      # Delete backups older than 30 days
       - name: Delete backups older than 30 days
         run: |
           find backup-repo/backups -type f -mtime +30 -delete
 
-      # Commit and push backup
       - name: Commit and push backup
         run: |
           cd backup-repo
