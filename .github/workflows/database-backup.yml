@@ -1,0 +1,43 @@
+name: Database Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 16 * * *'   # 10 PM IST
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Install PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client gzip git
+
+      - name: Dump database
+        run: |
+          pg_dump "${{ secrets.DATABASE_URL }}" | gzip > backup.sql.gz
+
+      - name: Clone backup repo
+        run: |
+          git clone https://x-access-token:${{ secrets.BACKUP_REPO_TOKEN }}@github.com/${{ secrets.BACKUP_REPO }} backup-repo
+
+      - name: Move backup
+        run: |
+          mkdir -p backup-repo/backups
+          mv backup.sql.gz backup-repo/backups/
+
+      - name: Delete backups older than 30 days
+        run: |
+          find backup-repo/backups -type f -mtime +30 -delete
+
+      - name: Commit and push backup
+        run: |
+          cd backup-repo
+          git config user.name "backup-bot"
+          git config user.email "backup@github.com"
+          git add .
+          git commit -m "Database backup $(date +%F)" || echo "Nothing to commit"
+          git push
