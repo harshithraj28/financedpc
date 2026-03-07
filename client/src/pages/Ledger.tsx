@@ -18,6 +18,7 @@ interface Transaction {
 }
 
 export default function Ledger() {
+
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [search, setSearch] = useState("");
@@ -28,7 +29,6 @@ export default function Ledger() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
   const [highlightIndex, setHighlightIndex] = useState(-1);
-  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [newName, setNewName] = useState("");
@@ -41,7 +41,8 @@ export default function Ledger() {
     new Date().toISOString().split("T")[0]
   );
 
-  // ================= LOAD =================
+  // LOAD DATA
+
   const loadTransactions = async () => {
     const res = await fetch(`/api/transactions?date=${selectedDate}`);
     const data = await res.json();
@@ -59,8 +60,10 @@ export default function Ledger() {
     loadDashboard();
   }, [selectedDate]);
 
-  // ================= SEARCH =================
+  // SEARCH CUSTOMER
+
   const searchAccounts = async (value: string) => {
+
     setSearch(value);
     setHighlightIndex(-1);
 
@@ -71,15 +74,40 @@ export default function Ledger() {
 
     const res = await fetch(`/api/accounts/search?q=${value}`);
     const data = await res.json();
-    setAccounts(Array.isArray(data) ? data : []);
+
+    if (!Array.isArray(data)) {
+      setAccounts([]);
+      return;
+    }
+
+    const v = value.toLowerCase();
+
+    const filtered = data.filter((acc: Account) => {
+
+      const code = acc.code.toLowerCase();
+      const name = acc.name.toLowerCase();
+
+      if (code.startsWith(v)) return true;
+      if (code.includes(v)) return true;
+      if (name.includes(v)) return true;
+
+      return false;
+    });
+
+    setAccounts(filtered);
   };
 
+  // KEYBOARD NAVIGATION
+
   const handleSearchKeyDown = (e: any) => {
+
     if (accounts.length === 0) {
+
       if (e.key === "Enter" && search.trim() !== "") {
         setNewName(search);
         setShowModal(true);
       }
+
       return;
     }
 
@@ -103,8 +131,10 @@ export default function Ledger() {
     }
   };
 
-  // ================= SELECT =================
+  // SELECT ACCOUNT
+
   const selectAccount = async (account: Account) => {
+
     setSelectedAccount(account);
     setSearch(`${account.code} - ${account.name}`);
     setAccounts([]);
@@ -117,18 +147,24 @@ export default function Ledger() {
     setTimeout(() => amountRef.current?.focus(), 100);
   };
 
-  // ================= CREATE ACCOUNT =================
+  // CREATE CUSTOMER
+
   const createCustomer = async () => {
+
     if (!newName || !newCode)
       return alert("Enter name and unique code");
 
     const res = await fetch("/api/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, code: newCode })
+      body: JSON.stringify({
+        name: newName,
+        code: newCode
+      })
     });
 
     const data = await res.json();
+
     if (!res.ok) return alert(data.message);
 
     setShowModal(false);
@@ -138,34 +174,26 @@ export default function Ledger() {
     selectAccount(data);
   };
 
-  // ================= SAVE =================
+  // SAVE TRANSACTION
+
   const saveTransaction = async () => {
+
     if (!selectedAccount || !amount)
       return alert("Fill required fields");
 
-    if (editingId) {
-      await fetch(`/api/transactions/${editingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, type, detail })
-      });
-    } else {
-      await fetch("/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accountId: selectedAccount.id,
-          amount,
-          type,
-          detail,
-          date: selectedDate   // ✅ MUST ADD THIS
-        })
-      });
-    }
+    await fetch("/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accountId: selectedAccount.id,
+        amount,
+        type,
+        detail,
+        date: selectedDate
+      })
+    });
 
-    const res = await fetch(
-      `/api/accounts/${selectedAccount.id}/balance`
-    );
+    const res = await fetch(`/api/accounts/${selectedAccount.id}/balance`);
     const data = await res.json();
     setAccountBalance(data.balance);
 
@@ -173,7 +201,6 @@ export default function Ledger() {
     setDetail("");
     setSelectedAccount(null);
     setSearch("");
-    setEditingId(null);
 
     loadTransactions();
     loadDashboard();
@@ -181,34 +208,8 @@ export default function Ledger() {
     setTimeout(() => searchRef.current?.focus(), 100);
   };
 
-  // ================= EDIT =================
-  const editTransaction = (tx: Transaction) => {
-    setEditingId(tx.id);
-    setSelectedAccount({
-      id: tx.accountId,
-      name: tx.name,
-      code: ""
-    });
-    setSearch(tx.name);
-    setAmount(tx.amount);
-    setType(tx.type);
-    setDetail(tx.detail || "");
-    setTimeout(() => amountRef.current?.focus(), 100);
-  };
+  // UI
 
-  // ================= DELETE =================
-  const deleteTransaction = async (tx: Transaction) => {
-    if (!window.confirm("Delete this transaction?")) return;
-
-    await fetch(`/api/transactions/${tx.id}`, {
-      method: "DELETE"
-    });
-
-    loadTransactions();
-    loadDashboard();
-  };
-
-  // ================= UI STYLES =================
   const inputStyle = {
     padding: "8px 12px",
     borderRadius: 6,
@@ -226,12 +227,14 @@ export default function Ledger() {
   };
 
   return (
+
     <div style={{
       minHeight: "100vh",
       background: "#f3f4f6",
       padding: 40,
       fontFamily: "system-ui"
     }}>
+
       <div style={{
         maxWidth: 1100,
         margin: "0 auto",
@@ -242,14 +245,17 @@ export default function Ledger() {
       }}>
 
         {/* HEADER */}
+
         <div style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 30
         }}>
+
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label>Date:</label>
+
             <input
               type="date"
               value={selectedDate}
@@ -261,6 +267,23 @@ export default function Ledger() {
           <h1 style={{ fontWeight: 700, fontSize: 28 }}>
             DPC-92
           </h1>
+      
+        {/* INSTALL APP BUTTON */}
+
+          <button
+            id="installApp"
+            style={{
+              display: "none",
+              padding: "8px 16px",
+              background: "#1a73e8",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer"
+            }}
+          >
+            Install App
+          </button>
 
           <button
             style={{
@@ -271,26 +294,32 @@ export default function Ledger() {
               borderRadius: 6,
               cursor: "pointer"
             }}
-            onClick={() => window.open(`/api/export/outstanding?date=${selectedDate}`)}
+            onClick={() =>
+              window.open(`/api/export/outstanding?date=${selectedDate}`)
+            }
           >
             Export to PDF
           </button>
+
         </div>
 
         {/* ENTRY SECTION */}
+
         <div style={{
-          display: "flex",
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr 1fr 2fr auto",
           gap: 10,
           alignItems: "center",
           marginBottom: 30,
           position: "relative"
         }}>
+
           <input
             ref={searchRef}
             placeholder="Search Code or Name"
             value={search}
             onChange={(e) => searchAccounts(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
+            onKeyDown={(e) => handleSearchKeyDown(e)}
             style={inputStyle}
           />
 
@@ -298,6 +327,7 @@ export default function Ledger() {
             <div style={{
               position: "absolute",
               top: 40,
+              left: 0,
               background: "white",
               border: "1px solid #e5e7eb",
               borderRadius: 6,
@@ -351,164 +381,142 @@ export default function Ledger() {
           />
 
           <button onClick={saveTransaction} style={buttonStyle}>
-            {editingId ? "Update" : "Save"}
+            Save
           </button>
-
           {accountBalance !== null && (
-            <span style={{
-              padding: "6px 12px",
-              borderRadius: 20,
-              background:
-                accountBalance > 0 ? "#fee2e2" : "#dcfce7",
-              color:
-                accountBalance > 0 ? "#b91c1c" : "#166534",
-              fontWeight: 600
-            }}>
+            <span
+              style={{
+                padding: "6px 12px",
+                borderRadius: 20,
+                background: accountBalance > 0 ? "#fee2e2" : "#dcfce7",
+                color: accountBalance > 0 ? "#b91c1c" : "#166534",
+                fontWeight: 600,
+                marginLeft: 10
+              }}
+            >
               ₹ {accountBalance}
             </span>
           )}
+
         </div>
 
-        {/* TABLE & SUMMARY remain same as your version */}
-        {/* ================= TABLE ================= */}
+        {/* TABLE */}
+
         <table style={{
           width: "100%",
-          borderCollapse: "collapse",
-          marginTop: 20
+          borderCollapse: "collapse"
         }}>
+
           <thead>
             <tr style={{ background: "#f9fafb" }}>
-              <th style={{ padding: 12, textAlign: "left" }}>Serial</th>
-              <th style={{ padding: 12, textAlign: "left" }}>Name</th>
-              <th style={{ padding: 12, textAlign: "left" }}>Detail</th>
-              <th style={{ padding: 12, textAlign: "right" }}>Credit</th>
-              <th style={{ padding: 12, textAlign: "right" }}>Debit</th>
-              <th style={{ padding: 12, textAlign: "right" }}>Actions</th>
+              <th style={{ padding: 12 }}>Serial</th>
+              <th style={{ padding: 12 }}>Name</th>
+              <th style={{ padding: 12 }}>Detail</th>
+              <th style={{ padding: 12 }}>Credit</th>
+              <th style={{ padding: 12 }}>Debit</th>
             </tr>
           </thead>
 
           <tbody>
-            {transactions.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#6b7280" }}>
-                  No transactions for this date
-                </td>
-              </tr>
-            )}
-
             {transactions.map(tx => (
               <tr key={tx.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                <td style={{ padding: 12 }}>{tx.serial}</td>
-                <td style={{ padding: 12 }}>{tx.name}</td>
-                <td style={{ padding: 12 }}>{tx.detail || "-"}</td>
 
-                <td style={{ padding: 12, textAlign: "right" }}>
-                  {tx.type === "credit"
-                    ? Number(tx.amount).toFixed(2)
-                    : ""}
+                <td style={{ padding: 12, textAlign: "center" }}>
+                  {tx.serial}
                 </td>
 
-                <td style={{ padding: 12, textAlign: "right" }}>
-                  {tx.type === "debit"
-                    ? Number(tx.amount).toFixed(2)
-                    : ""}
+                <td style={{ padding: 12, textAlign: "center" }}>
+                  {tx.name}
                 </td>
 
-                <td style={{ padding: 12, textAlign: "right" }}>
-                  <span
-                    style={{ cursor: "pointer", marginRight: 12 }}
-                    onClick={() => editTransaction(tx)}
-                  >
-                    ✏️
-                  </span>
-
-                  <span
-                    style={{ cursor: "pointer" }}
-                    onClick={() => deleteTransaction(tx)}
-                  >
-                    🗑️
-                  </span>
+                <td style={{ padding: 12, textAlign: "center" }}>
+                  {tx.detail || "-"}
                 </td>
+
+                <td style={{ padding: 12, textAlign: "center" }}>
+                  {tx.type === "credit" ? Number(tx.amount).toFixed(2) : ""}
+                </td>
+
+                <td style={{ padding: 12, textAlign: "center" }}>
+                  {tx.type === "debit" ? Number(tx.amount).toFixed(2) : ""}
+                </td>
+
               </tr>
             ))}
           </tbody>
+
         </table>
 
-        {/* ================= SUMMARY ================= */}
+        {/* SUMMARY */}
+
         {dashboard && (
+
           <div style={{
             display: "flex",
             gap: 20,
             marginTop: 30
           }}>
-            <div style={{
-              flex: 1,
-              background: "#e0f2fe",
-              padding: 20,
-              borderRadius: 10
-            }}>
+
+            <div style={{ flex: 1, background: "#e0f2fe", padding: 20 }}>
               <h4>Total Credit</h4>
               <p>₹ {dashboard.totalCredit}</p>
             </div>
 
-            <div style={{
-              flex: 1,
-              background: "#fef3c7",
-              padding: 20,
-              borderRadius: 10
-            }}>
+            <div style={{ flex: 1, background: "#fef3c7", padding: 20 }}>
               <h4>Total Debit</h4>
               <p>₹ {dashboard.totalDebit}</p>
             </div>
 
-            <div style={{
-              flex: 1,
-              background: "#ede9fe",
-              padding: 20,
-              borderRadius: 10
-            }}>
+            <div style={{ flex: 1, background: "#ede9fe", padding: 20 }}>
               <h4>Outstanding</h4>
               <p>₹ {dashboard.outstanding}</p>
             </div>
+
           </div>
+
         )}
-        {/* MODAL */}
+
+        {/* CREATE CUSTOMER MODAL */}
+
         {showModal && (
+
           <div style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.4)",
             display: "flex",
             justifyContent: "center",
-            alignItems: "center",
-            zIndex: 100
+            alignItems: "center"
           }}>
+
             <div style={{
               background: "white",
               padding: 30,
               borderRadius: 10,
               width: 350
             }}>
+
               <h3>Customer Not Found</h3>
 
               <input
                 placeholder="Customer Name"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                style={{ ...inputStyle, width: "100%", marginBottom: 10 }}
+                onChange={(e)=>setNewName(e.target.value)}
+                style={{...inputStyle,width:"100%",marginBottom:10}}
               />
 
               <input
                 placeholder="Unique Code"
                 value={newCode}
-                onChange={(e) => setNewCode(e.target.value)}
-                style={{ ...inputStyle, width: "100%", marginBottom: 20 }}
+                onChange={(e)=>setNewCode(e.target.value)}
+                style={{...inputStyle,width:"100%",marginBottom:20}}
               />
 
               <div style={{
-                display: "flex",
-                justifyContent: "space-between"
+                display:"flex",
+                justifyContent:"space-between"
               }}>
+
                 <button
                   style={buttonStyle}
                   onClick={createCustomer}
@@ -518,21 +526,28 @@ export default function Ledger() {
 
                 <button
                   style={{
-                    padding: "8px 16px",
-                    background: "#e5e7eb",
-                    border: "none",
-                    borderRadius: 6
+                    padding:"8px 16px",
+                    background:"#e5e7eb",
+                    border:"none",
+                    borderRadius:6
                   }}
-                  onClick={() => setShowModal(false)}
+                  onClick={()=>setShowModal(false)}
                 >
                   Cancel
                 </button>
+
               </div>
+
             </div>
+
           </div>
+
         )}
 
       </div>
+
     </div>
+
   );
+
 }

@@ -1,0 +1,31 @@
+const CACHE_NAME = "dpc92-v1";
+
+const urlsToCache = [
+  "/",
+  "/manifest.json"
+];
+
+self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(urlsToCache);
+    })
+  );
+});
+
+self.addEventListener("fetch", event => {
+
+  const url = new URL(event.request.url);
+
+  // ❗ Do not cache API calls
+  if (url.pathname.startsWith("/api")) {
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request);
+    })
+  );
+
+});
