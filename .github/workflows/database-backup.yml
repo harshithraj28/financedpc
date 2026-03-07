@@ -3,7 +3,7 @@ name: Database Backup
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 16 * * *'   # 10 PM IST
+    - cron: '30 16 * * *'   # Runs daily at 10 PM IST
 
 jobs:
   backup:
@@ -11,33 +11,42 @@ jobs:
 
     steps:
 
-      - name: Install PostgreSQL
+      # Install PostgreSQL 17 client (matches Neon server version)
+      - name: Install PostgreSQL 17 client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client gzip git
+          sudo apt-get install -y postgresql-client-17 gzip git
 
+      # Dump database safely
       - name: Dump database
         run: |
-          pg_dump "${{ secrets.DATABASE_URL }}" | gzip > backup.sql.gz
+          set -e
+          pg_dump "${{ secrets.DATABASE_URL }}" > backup.sql
+          gzip backup.sql
+          mv backup.sql.gz backup_$(date +%F_%H-%M).sql.gz
 
-      - name: Clone backup repo
+      # Clone backup repository
+      - name: Clone backup repository
         run: |
           git clone https://x-access-token:${{ secrets.BACKUP_REPO_TOKEN }}@github.com/${{ secrets.BACKUP_REPO }} backup-repo
 
+      # Move backup into repo
       - name: Move backup
         run: |
           mkdir -p backup-repo/backups
-          mv backup.sql.gz backup-repo/backups/
+          mv backup_*.sql.gz backup-repo/backups/
 
+      # Delete backups older than 30 days
       - name: Delete backups older than 30 days
         run: |
           find backup-repo/backups -type f -mtime +30 -delete
 
+      # Commit and push backup
       - name: Commit and push backup
         run: |
           cd backup-repo
           git config user.name "backup-bot"
           git config user.email "backup@github.com"
           git add .
-          git commit -m "Database backup $(date +%F)" || echo "Nothing to commit"
+          git commit -m "Database backup $(date +%F_%H-%M)" || echo "Nothing to commit"
           git push
